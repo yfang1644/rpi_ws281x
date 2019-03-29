@@ -2,7 +2,7 @@
 # Author: Tony DiCola (tony@tonydicola.com)
 from ez_setup import use_setuptools
 use_setuptools()
-from setuptools import setup, find_packages, Extension
+from distutils.core import setup, Extension
 
 setup(name              = 'rpi_ws281x',
       version           = '1.0.0',

@@ -361,14 +361,16 @@ const rpi_hw_t *rpi_hw_detect(void)
         rev = bswap_32(rev);  // linux,revision appears to be in big endian
     #endif
 
+    fclose(f);
+    // Take out warranty and manufacturer bits
+    rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
     for (i = 0; i < (sizeof(rpi_hw_info) / sizeof(rpi_hw_info[0])); i++)
     {
         uint32_t hwver = rpi_hw_info[i].hwver;
+        hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
         if (rev == hwver)
         {
-            result = &rpi_hw_info[i];
-
-            goto done;
+            return= &rpi_hw_info[i];
         }
     }
 #else
@@ -399,27 +401,21 @@ const rpi_hw_t *rpi_hw_detect(void)
                 continue;
             }
 
+            rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
             for (i = 0; i < (sizeof(rpi_hw_info) / sizeof(rpi_hw_info[0])); i++)
             {
                 uint32_t hwver = rpi_hw_info[i].hwver;
 
-                // Take out warranty and manufacturer bits
                 hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
-                rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
 
                 if (rev == hwver)
                 {
-                    result = &rpi_hw_info[i];
-
-                    goto done;
+                    fclose(f);
+                    return &rpi_hw_info[i];
                 }
             }
         }
     }
 #endif
-done:
-    fclose(f);
-
-    return result;
 }
 

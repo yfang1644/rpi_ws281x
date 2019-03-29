@@ -36,9 +36,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <signal.h>
-#include <linux/types.h>
 #include <linux/spi/spidev.h>
 #include <time.h>
 
@@ -46,9 +43,7 @@
 #include "clk.h"
 #include "gpio.h"
 #include "dma.h"
-#include "pwm.h"
 #include "pcm.h"
-#include "rpihw.h"
 
 #include "ws2811.h"
 
