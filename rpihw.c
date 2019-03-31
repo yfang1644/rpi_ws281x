@@ -370,7 +370,7 @@ const rpi_hw_t *rpi_hw_detect(void)
         hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
         if (rev == hwver)
         {
-            return= &rpi_hw_info[i];
+            return &rpi_hw_info[i];
         }
     }
 #else

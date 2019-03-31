@@ -74,5 +74,3 @@ uint32_t dmanum_to_offset(int dmanum)
 
     return dma_offset[dmanum];
 }
-
-
