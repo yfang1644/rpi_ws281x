@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/spi/spidev.h>
+#include <byteswap.h>
 #include <time.h>
 
 #include "mailbox.h"
@@ -55,24 +56,23 @@
 /* 4 colors (R, G, B + W), 8 bits per byte, 3 symbols per bit + 55uS low for reset signal */
 #define LED_COLOURS                              4
 #define LED_RESET_uS                             55
-#define LED_BIT_COUNT(leds, freq)                ((leds * LED_COLOURS * 8 * 3) + ((LED_RESET_uS * \
-                                                  (freq * 3)) / 1000000))
+#define LED_BIT_COUNT(leds, freq)                ((leds * LED_COLOURS * 8 * 4) \
+                                + ((LED_RESET_uS * (freq * 3)) / 1000000))
 
 /* Minimum time to wait for reset to occur in microseconds. */
 #define LED_RESET_WAIT_TIME                      300
 
 // Pad out to the nearest uint32 + 32-bits for idle low/high times the number of channels
-#define PWM_BYTE_COUNT(leds, freq)               (((((LED_BIT_COUNT(leds, freq) >> 3) & ~0x7) + 4) + 4) * \
-                                                  RPI_PWM_CHANNELS)
 #define PCM_BYTE_COUNT(leds, freq)               ((((LED_BIT_COUNT(leds, freq) >> 3) & ~0x7) + 4) + 4)
+#define PWM_BYTE_COUNT(leds, freq)               (PCM_BYTE_COUNT(leds, freq) * RPI_PWM_CHANNELS)
 
 // Symbol definitions
-#define SYMBOL_HIGH                              0x6  // 1 1 0
-#define SYMBOL_LOW                               0x4  // 1 0 0
+#define SYMBOL_HIGH                              0xe  // 1 1 1 0
+#define SYMBOL_LOW                               0x8  // 1 0 0 0
 
 // Symbol definitions for software inversion (PCM and SPI only)
-#define SYMBOL_HIGH_INV                          0x1  // 0 0 1
-#define SYMBOL_LOW_INV                           0x3  // 0 1 1
+#define SYMBOL_HIGH_INV                          0x1  // 0 0 0 1
+#define SYMBOL_LOW_INV                           0x7  // 0 1 1 1
 
 // Driver mode definitions
 #define NONE	0
@@ -553,8 +553,8 @@ void pwm_raw_init(ws2811_t *ws2811)
 {
     volatile uint32_t *pxl_raw = (uint32_t *)ws2811->device->pxl_raw;
     int maxcount = ws2811->device->max_count;
-    int wordcount = (PWM_BYTE_COUNT(maxcount, ws2811->freq) / sizeof(uint32_t)) /
-                    RPI_PWM_CHANNELS;
+    int wordcount = (PWM_BYTE_COUNT(maxcount, ws2811->freq) /
+                     sizeof(uint32_t)) / RPI_PWM_CHANNELS;
     int chan;
 
     for (chan = 0; chan < RPI_PWM_CHANNELS; chan++)
@@ -1117,6 +1117,7 @@ ws2811_return_t  ws2811_render(ws2811_t *ws2811)
 {
     volatile uint8_t *pxl_raw = ws2811->device->pxl_raw;
     int driver_mode = ws2811->device->driver_mode;
+    uint32_t *wordptr;
     int bitpos;
     int i, k, l, chan;
     unsigned j;
@@ -1124,25 +1125,23 @@ ws2811_return_t  ws2811_render(ws2811_t *ws2811)
     uint32_t protocol_time = 0;
     static uint64_t previous_timestamp = 0;
 
-    bitpos = (driver_mode == SPI ? 7 : 31);
+    bitpos = 32;
 
     for (chan = 0; chan < RPI_PWM_CHANNELS; chan++)         // Channel
     {
         ws2811_channel_t *channel = &ws2811->channel[chan];
 
-        int wordpos = chan; // PWM & PCM
-        int bytepos = 0;    // SPI
         const int scale = (channel->brightness & 0xff) + 1;
-        uint8_t array_size = 3; // Assume 3 color LEDs, RGB
+        uint8_t array_size = 24; // Assume 3 color LEDs, RGB, 24bits
 
         // If our shift mask includes the highest nibble, then we have 4 LEDs, RBGW.
         if (channel->strip_type & SK6812_SHIFT_WMASK)
         {
-            array_size = 4;
+            array_size = 32;
         }
 
         // 1.25µs per bit
-        const uint32_t channel_protocol_time = channel->count * array_size * 8 * 1.25;
+        const uint32_t channel_protocol_time = channel->count * array_size * 1.25;
 
         // Only using the channel which takes the longest as both run in parallel
         if (channel_protocol_time > protocol_time)
@@ -1150,68 +1149,43 @@ ws2811_return_t  ws2811_render(ws2811_t *ws2811)
             protocol_time = channel_protocol_time;
         }
 
+        if (driver_mode == SPI)
+            wordptr = &((uint32_t *)pxl_raw)[0];
+        else
+            wordptr = &((uint32_t *)pxl_raw)[chan];
         for (i = 0; i < channel->count; i++)                // Led
         {
-            uint8_t color[] =
-            {
-                channel->gamma[(((channel->leds[i] >> channel->rshift) & 0xff) * scale) >> 8], // red
-                channel->gamma[(((channel->leds[i] >> channel->gshift) & 0xff) * scale) >> 8], // green
-                channel->gamma[(((channel->leds[i] >> channel->bshift) & 0xff) * scale) >> 8], // blue
-                channel->gamma[(((channel->leds[i] >> channel->wshift) & 0xff) * scale) >> 8], // white
-            };
+            uint8_t r, g, b, w;
+            uint32_t color;
+            r = channel->gamma[(((channel->leds[i] >> channel->rshift) & 0xff) * scale) >> 8];
+            g = channel->gamma[(((channel->leds[i] >> channel->gshift) & 0xff) * scale) >> 8];
+            b = channel->gamma[(((channel->leds[i] >> channel->bshift) & 0xff) * scale) >> 8];
+            w = channel->gamma[(((channel->leds[i] >> channel->wshift) & 0xff) * scale) >> 8];
+
+            color = (r << 24)|(g << 16)|(b << 8)|w;
 
             for (j = 0; j < array_size; j++)               // Color
             {
-                for (k = 7; k >= 0; k--)                   // Bit
+                uint32_t symbol = SYMBOL_LOW;
+                if (color & 0x80000000)
+                    symbol = SYMBOL_HIGH;
+
+                color <<= 1;
+                // Inversion is handled by hardware for PWM, otherwise by software here
+                if ((driver_mode != PWM) && channel->invert)
+                    symbol = (~symbol) & 0x0f;   /* INVERTED */
+
+                bitpos -= 4;
+                *wordptr &= ~(15 << bitpos);
+                *wordptr |= (symbol << bitpos);
+
+                if (bitpos == 0)
                 {
-                    // Inversion is handled by hardware for PWM, otherwise by software here
-                    uint8_t symbol = SYMBOL_LOW;
-                    if ((driver_mode != PWM) && channel->invert) symbol = SYMBOL_LOW_INV;
-
-                    if (color[j] & (1 << k))
-                    {
-                        symbol = SYMBOL_HIGH;
-                        if ((driver_mode != PWM) && channel->invert) symbol = SYMBOL_HIGH_INV;
-                    }
-
-                    for (l = 2; l >= 0; l--)               // Symbol
-                    {
-                        uint32_t *wordptr = &((uint32_t *)pxl_raw)[wordpos];   // PWM & PCM
-                        volatile uint8_t  *byteptr = &pxl_raw[bytepos];    // SPI
-
-                        if (driver_mode == SPI)
-                        {
-                            *byteptr &= ~(1 << bitpos);
-                            if (symbol & (1 << l))
-                            {
-                                *byteptr |= (1 << bitpos);
-                            }
-                        }
-                        else  // PWM & PCM
-                        {
-                            *wordptr &= ~(1 << bitpos);
-                            if (symbol & (1 << l))
-                            {
-                                *wordptr |= (1 << bitpos);
-                            }
-                        }
-
-                        bitpos--;
-                        if (bitpos < 0)
-                        {
-                            if (driver_mode == SPI)
-                            {
-                                bytepos++;
-                                bitpos = 7;
-                            }
-                            else  // PWM & PCM
-                            {
-                                // Every other word is on the same channel for PWM
-                                wordpos += (driver_mode == PWM ? 2 : 1);
-                                bitpos = 31;
-                            }
-                        }
-                    }
+                    // Every other word is on the same channel for PWM
+                    if (driver_mode == SPI)
+                        *wordptr = bswap_32(*wordptr);
+                    wordptr += (driver_mode == PWM ? 2 : 1);
+                    bitpos = 32;
                 }
             }
         }
