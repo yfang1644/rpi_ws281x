@@ -126,6 +126,37 @@ static uint64_t get_microsecond_timestamp()
 }
 
 /**
+ * Wait for any executing DMA operation to complete before returning.
+ *
+ * @param    ws2811  ws2811 instance pointer.
+ *
+ * @returns  0 on success, -1 on DMA competion error
+ */
+ws2811_return_t ws2811_wait(ws2811_t *ws2811)
+{
+    volatile dma_t *dma = ws2811->device->dma;
+
+    if (ws2811->device->driver_mode == SPI)  // Nothing to do for SPI
+    {
+        return WS2811_SUCCESS;
+    }
+
+    while ((dma->cs & RPI_DMA_CS_ACTIVE) &&
+           !(dma->cs & RPI_DMA_CS_ERROR))
+    {
+        usleep(10);
+    }
+
+    if (dma->cs & RPI_DMA_CS_ERROR)
+    {
+        fprintf(stderr, "DMA Error: %08x\n", dma->debug);
+        return WS2811_ERROR_DMA;
+    }
+
+    return WS2811_SUCCESS;
+}
+
+/**
  * Iterate through the channels and find the largest led count.
  *
  * @param    ws2811  ws2811 instance pointer.
@@ -1072,37 +1103,6 @@ void ws2811_fini(ws2811_t *ws2811)
     unmap_registers(ws2811);
 
     ws2811_cleanup(ws2811);
-}
-
-/**
- * Wait for any executing DMA operation to complete before returning.
- *
- * @param    ws2811  ws2811 instance pointer.
- *
- * @returns  0 on success, -1 on DMA competion error
- */
-ws2811_return_t ws2811_wait(ws2811_t *ws2811)
-{
-    volatile dma_t *dma = ws2811->device->dma;
-
-    if (ws2811->device->driver_mode == SPI)  // Nothing to do for SPI
-    {
-        return WS2811_SUCCESS;
-    }
-
-    while ((dma->cs & RPI_DMA_CS_ACTIVE) &&
-           !(dma->cs & RPI_DMA_CS_ERROR))
-    {
-        usleep(10);
-    }
-
-    if (dma->cs & RPI_DMA_CS_ERROR)
-    {
-        fprintf(stderr, "DMA Error: %08x\n", dma->debug);
-        return WS2811_ERROR_DMA;
-    }
-
-    return WS2811_SUCCESS;
 }
 
 /**
