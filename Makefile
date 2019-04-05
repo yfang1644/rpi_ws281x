@@ -1,4 +1,4 @@
-SRC = mailbox.c  pcm.c  ws2811.c  dma.c  pwm.c  rpihw.c   
+SRC = ws2811.c
 
 libws2811.so: $(SRC)
 	gcc -o $@ $^ -shared -fPIC

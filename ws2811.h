@@ -35,9 +35,6 @@
 extern "C" {
 #endif
 
-#include "rpihw.h"
-#include "pwm.h"
-
 
 #define WS2811_TARGET_FREQ                       800000   // Can go as low as 400000
 
@@ -68,7 +65,6 @@ struct ws2811_device;
 typedef uint32_t ws2811_led_t;                   //< 0xWWRRGGBB
 typedef struct ws2811_channel_t
 {
-    int gpionum;                                 //< GPIO Pin with PWM alternate function, 0 if unused
     int invert;                                  //< Invert output signal
     int count;                                   //< Number of LEDs, 0 if channel is unused
     int strip_type;                              //< Strip color layout -- one of WS2811_STRIP_xxx constants
@@ -85,10 +81,8 @@ typedef struct ws2811_t
 {
     uint64_t render_wait_time;                   //< time in µs before the next render can run
     struct ws2811_device *device;                //< Private data for driver use
-    const rpi_hw_t *rpi_hw;                      //< RPI Hardware Information
     uint32_t freq;                               //< Required output frequency
-    int dmanum;                                  //< DMA number _not_ already in use
-    ws2811_channel_t channel[RPI_PWM_CHANNELS];
+    ws2811_channel_t channel;
 } ws2811_t;
 
 #define WS2811_RETURN_STATES(X)                                                             \

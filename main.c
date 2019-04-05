@@ -65,24 +65,12 @@ int clear_on_exit = 0;
 ws2811_t ledstring =
 {
     .freq = TARGET_FREQ,
-    .dmanum = DMA,
     .channel =
     {
-        [0] =
-        {
-            .gpionum = GPIO_PIN,
-            .count = LED_COUNT,
-            .invert = 0,
-            .brightness = 255,
-            .strip_type = STRIP_TYPE,
-        },
-        [1] =
-        {
-            .gpionum = 0,
-            .count = 0,
-            .invert = 0,
-            .brightness = 0,
-        },
+        .count = LED_COUNT,
+        .invert = 0,
+        .brightness = 255,
+        .strip_type = STRIP_TYPE,
     },
 };
 
@@ -98,7 +86,7 @@ void matrix_render(void)
     {
         for (y = 0; y < height; y++)
         {
-            ledstring.channel[0].leds[(y * width) + x] = matrix[y * width + x];
+            ledstring.channel.leds[(y * width) + x] = matrix[y * width + x];
         }
     }
 }
@@ -169,7 +157,7 @@ void matrix_bottom(void)
             dotspos[i] = 0;
         }
 
-        if (ledstring.channel[0].strip_type == SK6812_STRIP_RGBW) {
+        if (ledstring.channel.strip_type == SK6812_STRIP_RGBW) {
             matrix[dotspos[i] + (height - 1) * width] = dotcolors_rgbw[i];
         } else {
             matrix[dotspos[i] + (height - 1) * width] = dotcolors[i];
@@ -218,7 +206,7 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 	{
 
 		index = 0;
-		c = getopt_long(argc, argv, "cd:g:his:vx:y:", longopts, &index);
+		c = getopt_long(argc, argv, "chis:vx:y:", longopts, &index);
 
 		if (c == -1)
 			break;
@@ -248,52 +236,19 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 		case 'D':
 			break;
 
-		case 'g':
-			if (optarg) {
-				int gpio = atoi(optarg);
-/*
-	PWM0, which can be set to use GPIOs 12, 18, 40, and 52.
-	Only 12 (pin 32) and 18 (pin 12) are available on the B+/2B/3B
-	PWM1 which can be set to use GPIOs 13, 19, 41, 45 and 53.
-	Only 13 is available on the B+/2B/PiZero/3B, on pin 33
-	PCM_DOUT, which can be set to use GPIOs 21 and 31.
-	Only 21 is available on the B+/2B/PiZero/3B, on pin 40.
-	SPI0-MOSI is available on GPIOs 10 and 38.
-	Only GPIO 10 is available on all models.
-
-	The library checks if the specified gpio is available
-	on the specific model (from model B rev 1 till 3B)
-
-*/
-				ws2811->channel[0].gpionum = gpio;
-			}
-			break;
-
 		case 'i':
-			ws2811->channel[0].invert=1;
+			ws2811->channel.invert=1;
 			break;
 
 		case 'c':
 			clear_on_exit=1;
 			break;
 
-		case 'd':
-			if (optarg) {
-				int dma = atoi(optarg);
-				if (dma < 14) {
-					ws2811->dmanum = dma;
-				} else {
-					printf ("invalid dma %d\n", dma);
-					exit (-1);
-				}
-			}
-			break;
-
 		case 'y':
 			if (optarg) {
 				height = atoi(optarg);
 				if (height > 0) {
-					ws2811->channel[0].count = height * width;
+					ws2811->channel.count = height * width;
 				} else {
 					printf ("invalid height %d\n", height);
 					exit (-1);
@@ -305,7 +260,7 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 			if (optarg) {
 				width = atoi(optarg);
 				if (width > 0) {
-					ws2811->channel[0].count = height * width;
+					ws2811->channel.count = height * width;
 				} else {
 					printf ("invalid width %d\n", width);
 					exit (-1);
@@ -316,28 +271,28 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 		case 's':
 			if (optarg) {
 				if (!strncasecmp("rgb", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_RGB;
+					ws2811->channel.strip_type = WS2811_STRIP_RGB;
 				}
 				else if (!strncasecmp("rbg", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_RBG;
+					ws2811->channel.strip_type = WS2811_STRIP_RBG;
 				}
 				else if (!strncasecmp("grb", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_GRB;
+					ws2811->channel.strip_type = WS2811_STRIP_GRB;
 				}
 				else if (!strncasecmp("gbr", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_GBR;
+					ws2811->channel.strip_type = WS2811_STRIP_GBR;
 				}
 				else if (!strncasecmp("brg", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_BRG;
+					ws2811->channel.strip_type = WS2811_STRIP_BRG;
 				}
 				else if (!strncasecmp("bgr", optarg, 4)) {
-					ws2811->channel[0].strip_type = WS2811_STRIP_BGR;
+					ws2811->channel.strip_type = WS2811_STRIP_BGR;
 				}
 				else if (!strncasecmp("rgbw", optarg, 4)) {
-					ws2811->channel[0].strip_type = SK6812_STRIP_RGBW;
+					ws2811->channel.strip_type = SK6812_STRIP_RGBW;
 				}
 				else if (!strncasecmp("grbw", optarg, 4)) {
-					ws2811->channel[0].strip_type = SK6812_STRIP_GRBW;
+					ws2811->channel.strip_type = SK6812_STRIP_GRBW;
 				}
 				else {
 					printf ("invalid strip %s\n", optarg);
