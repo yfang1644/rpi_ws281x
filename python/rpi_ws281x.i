@@ -43,6 +43,6 @@
 
     ws2811_channel_t *ws2811_channel_get(ws2811_t *ws, int channelnum)
     {
-        return &ws->channel[channelnum];
+        return &ws->channel;
     }
 %}

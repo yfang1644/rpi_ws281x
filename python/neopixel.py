@@ -50,38 +50,26 @@ class _LED_Data(object):
 
 
 class Adafruit_NeoPixel(object):
-    def __init__(self, num, pin=18, freq_hz=800000, dma=10, invert=False,
-            brightness=255, channel=0, strip_type=ws.WS2811_STRIP_GRB):
+    def __init__(self, num, freq_hz=800000, invert=False,
+            brightness=255, strip_type=ws.WS2811_STRIP_GRB):
         """Class to represent a NeoPixel/WS281x LED display.  Num should be the
-        number of pixels in the display, and pin should be the GPIO pin connected
-        to the display signal line (must be a PWM pin like 18!).  Optional
-        parameters are freq, the frequency of the display signal in hertz (default
-        800khz), dma, the DMA channel to use (default 10), invert, a boolean
-        specifying if the signal line should be inverted (default False), and
-        channel, the PWM channel to use (defaults to 0).
+        number of pixels in the display, using SPI.  Optional parameters are
+        freq, the frequency of the display signal in hertz (default 800khz),
+        invert, a boolean specifying if the signal line should be inverted
+        (default False).
         """
         # Create ws2811_t structure and fill in parameters.
         self._leds = ws.new_ws2811_t()
 
-        # Initialize the channels to zero
-        for channum in range(2):
-            chan = ws.ws2811_channel_get(self._leds, channum)
-            ws.ws2811_channel_t_count_set(chan, 0)
-            ws.ws2811_channel_t_gpionum_set(chan, 0)
-            ws.ws2811_channel_t_invert_set(chan, 0)
-            ws.ws2811_channel_t_brightness_set(chan, 0)
-
         # Initialize the channel in use
-        self._channel = ws.ws2811_channel_get(self._leds, channel)
+        self._channel = ws.ws2811_channel_get(self._leds, 0)
         ws.ws2811_channel_t_count_set(self._channel, num)
-        ws.ws2811_channel_t_gpionum_set(self._channel, pin)
         ws.ws2811_channel_t_invert_set(self._channel, 0 if not invert else 1)
         ws.ws2811_channel_t_brightness_set(self._channel, brightness)
         ws.ws2811_channel_t_strip_type_set(self._channel, strip_type)
 
         # Initialize the controller
         ws.ws2811_t_freq_set(self._leds, freq_hz)
-        ws.ws2811_t_dmanum_set(self._leds, dma)
 
         # Grab the led data array.
         self._led_data = _LED_Data(self._channel, num)
