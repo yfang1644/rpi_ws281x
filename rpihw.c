@@ -346,35 +346,35 @@ const rpi_hw_t *rpi_hw_detect(void)
 {
     const rpi_hw_t *result = NULL;
     uint32_t rev;
+    uint32_t hwver;
     unsigned i;
+    FILE *f;
 
-#ifdef __aarch64__
     // On ARM64, read revision from /proc/device-tree as it is not shown in
     // /proc/cpuinfo
-    FILE *f = fopen("/proc/device-tree/system/linux,revision", "r");
-    if (!f)
+    f = fopen("/proc/device-tree/system/linux,revision", "r");
+    if (f)
     {
-        return NULL;
-    }
-    fread(&rev, sizeof(uint32_t), 1, f);
-    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        fread(&rev, sizeof(uint32_t), 1, f);
+        #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         rev = bswap_32(rev);  // linux,revision appears to be in big endian
-    #endif
+        #endif
 
-    fclose(f);
-    // Take out warranty and manufacturer bits
-    rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
-    for (i = 0; i < (sizeof(rpi_hw_info) / sizeof(rpi_hw_info[0])); i++)
-    {
-        uint32_t hwver = rpi_hw_info[i].hwver;
-        hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
-        if (rev == hwver)
+        fclose(f);
+        // Take out warranty and manufacturer bits
+        rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
+        for (i = 0; i < (sizeof(rpi_hw_info) / sizeof(rpi_hw_info[0])); i++)
         {
-            return &rpi_hw_info[i];
+            hwver = rpi_hw_info[i].hwver;
+            hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
+            if (rev == hwver)
+            {
+                return &rpi_hw_info[i];
+            }
         }
     }
-#else
-    FILE *f = fopen("/proc/cpuinfo", "r");
+
+    f = fopen("/proc/cpuinfo", "r");
     char line[LINE_WIDTH_MAX];
 
     if (!f)
@@ -404,7 +404,7 @@ const rpi_hw_t *rpi_hw_detect(void)
             rev &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
             for (i = 0; i < (sizeof(rpi_hw_info) / sizeof(rpi_hw_info[0])); i++)
             {
-                uint32_t hwver = rpi_hw_info[i].hwver;
+                hwver = rpi_hw_info[i].hwver;
 
                 hwver &= ~(RPI_WARRANTY_MASK | RPI_MANUFACTURER_MASK);
 
@@ -416,6 +416,5 @@ const rpi_hw_t *rpi_hw_detect(void)
             }
         }
     }
-#endif
+    return NULL;
 }
-
